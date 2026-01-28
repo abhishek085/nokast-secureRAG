@@ -155,22 +155,22 @@ Query: {query}<|im_end|>
         
         # Note: This is a simplified training setup
         # In production, you would call mlx_lm training functions
-        print("""
+        print(f"""
 To train the model, run:
     python -m mlx_lm.lora \\
-        --model {model} \\
+        --model {config['model']} \\
         --train \\
-        --data {train_data} \\
-        --valid-data {val_data} \\
-        --batch-size {batch_size} \\
-        --lora-layers {lora_layers} \\
-        --lora-rank {lora_rank} \\
-        --iters {iters} \\
-        --learning-rate {learning_rate} \\
-        --adapter-file {adapter_file}
+        --data {config['data']} \\
+        --valid-data {config['valid_data']} \\
+        --batch-size {config['batch_size']} \\
+        --lora-layers {config['lora_layers']} \\
+        --lora-rank {config['lora_rank']} \\
+        --iters {config['iters']} \\
+        --learning-rate {config['learning_rate']} \\
+        --adapter-file {config['adapter_file']}
         
 Or use the mlx_lm API directly in your code.
-""".format(**config))
+""")
         
         # Save config for reference
         config_path = os.path.join(self.output_dir, "train_config.json")
