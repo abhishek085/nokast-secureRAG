@@ -1,0 +1,30 @@
+# Example configuration for Nokast-secureRAG
+
+# Model Configuration
+MODEL_NAME: "Qwen/Qwen2.5-0.5B"
+OLLAMA_MODEL: "kimi-k2.5:cloud"
+
+# Data Generation
+NUM_SAMPLES: 5000
+SAFE_RATIO: 0.5
+
+# Training Configuration
+LORA_RANK: 8
+LORA_ALPHA: 16
+LORA_DROPOUT: 0.05
+LEARNING_RATE: 1e-4
+BATCH_SIZE: 4
+NUM_EPOCHS: 3
+TRAIN_SPLIT: 0.9
+
+# Detection Configuration
+CONFIDENCE_THRESHOLD: 0.7
+
+# Paths
+DATA_DIR: "data"
+MODEL_DIR: "models"
+ADAPTER_DIR: "models/adapters"
+EVAL_DIR: "eval"
+
+# Ollama Configuration
+OLLAMA_URL: "http://localhost:11434"
