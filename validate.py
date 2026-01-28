@@ -248,7 +248,7 @@ def main():
         print(f"{status}: {test_name}")
     
     print("-"*70)
-    print(f"Total: {passed}/{total} tests passed ({100*passed//total}%)")
+    print(f"Total: {passed}/{total} tests passed ({100*passed/total:.0f}%)")
     print("="*70)
     
     if passed == total:

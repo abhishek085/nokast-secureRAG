@@ -113,7 +113,9 @@ Provide a brief reasoning (2-3 sentences) explaining why this query is {label}."
         # Fallback reasoning if Ollama fails
         if not reasoning:
             if is_malicious:
-                reasoning = f"This query attempts to override system instructions with commands like '{query.split('{')[0]}', which is a clear prompt injection attempt."
+                # Extract the attack pattern prefix (before any formatted content)
+                attack_pattern = template.split('{')[0].strip() if '{' in template else template
+                reasoning = f"This query attempts to override system instructions with commands like '{attack_pattern}', which is a clear prompt injection attempt."
             else:
                 reasoning = "This is a legitimate information-seeking query without any attempt to manipulate the system or override instructions."
         
