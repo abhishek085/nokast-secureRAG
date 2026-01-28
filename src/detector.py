@@ -30,15 +30,15 @@ class PromptInjectionDetector:
         
         # Fallback patterns for when model is not loaded
         self.injection_patterns = [
-            r"ignore\s+(previous|above|all|prior)\s+instructions?",
-            r"disregard\s+(previous|above|all|context)",
-            r"forget\s+(everything|what|previous)",
-            r"system\s*:\s*new\s+directive",
-            r"override",
-            r"admin[\s_]*mode",
-            r"reveal\s+(system\s+)?prompt",
-            r"print\s+(all\s+)?instructions",
-            r"show\s+(confidential|private|secret)",
+            r"(?i)ignore\s+((all|previous|above|prior)\s+)*(previous|above|all|prior)\s+instructions?",
+            r"(?i)disregard\s+(previous|above|all|context)",
+            r"(?i)forget\s+(everything|what|previous)",
+            r"(?i)system\s*:\s*new\s+directive",
+            r"(?i)override",
+            r"(?i)admin[\s_]*mode",
+            r"(?i)reveal\s+(system\s+)?prompt",
+            r"(?i)print\s+(all\s+)?instructions",
+            r"(?i)show\s+(confidential|private|secret)",
         ]
         
     def load_model(self):
@@ -120,10 +120,8 @@ Query: {query}<|im_end|>
     
     def detect_with_patterns(self, query: str) -> Tuple[str, float, str]:
         """Fallback pattern-based detection"""
-        query_lower = query.lower()
-        
         for pattern in self.injection_patterns:
-            if re.search(pattern, query_lower, re.IGNORECASE):
+            if re.search(pattern, query):
                 return (
                     "MALICIOUS",
                     0.7,

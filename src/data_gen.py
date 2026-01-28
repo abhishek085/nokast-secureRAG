@@ -6,7 +6,14 @@ import json
 import os
 import random
 from typing import List, Dict
-from tqdm import tqdm
+
+try:
+    from tqdm import tqdm
+except ImportError:
+    # Fallback if tqdm not installed
+    def tqdm(iterable, **kwargs):
+        return iterable
+
 import requests
 
 
