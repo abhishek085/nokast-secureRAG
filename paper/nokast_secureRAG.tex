@@ -3,10 +3,9 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{booktabs}
 \usepackage{amsmath}
-\usepackage{graphicx}
 \usepackage{hyperref}
-\usepackage{xcolor}
-\usepackage{multirow}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning}
 
 \title{\textbf{Nokast-SecureRAG: A Local Small-Language-Model Semantic
 Firewall for Indirect Prompt Injection in Retrieval-Augmented Generation}}
@@ -21,15 +20,15 @@ Local Retrieval-Augmented Generation (RAG) systems let powerful assistants opera
 over private data, but inherit a growing class of security risks---particularly
 Indirect Prompt Injection (IPI) and retrieval poisoning, in which adversarial
 instructions hidden in retrieved content are executed by the model as if
-trusted~\cite{greshake,agentpoison,hipt}. Existing defenses are either
+trusted~\cite{greshake,agentpoison,openragsoc}. Existing defenses are either
 retrieval-centric (sanitization) or safety-centric guards trained on direct
-jailbreaks rather than RAG context consistency~\cite{hipt,llamaguard}. We present
+jailbreaks rather than RAG context consistency~\cite{openragsoc,llamaguard}. We present
 \emph{nokast-secureRAG}, a $\sim$0.5B-parameter Small Language Model (SLM) that acts
 as a \emph{semantic firewall} between the retriever and the generator: it jointly
 reads the user query $Q$ and the retrieved context $C$ and classifies the pair as
 \textsf{safe}, \textsf{suspicious}, or \textsf{malicious-instruction}. The model is
 produced by a \emph{teacher$\rightarrow$judge$\rightarrow$student} distillation
-pipeline: a 35B teacher generates 5{,}233 realistic $(Q,C)$ records across five
+pipeline: a 35B teacher generates 5{,}233 realistic $(Q,C)$ records across four
 attack families; an independent, larger 120B judge of a different model family
 re-labels every record blind, yielding $95.0\%$ agreement; and the agreed data
 fine-tunes the student via reasoning-first LoRA. On a held-out test set the tuned
@@ -38,17 +37,19 @@ attack-success-rate (detection-side proxy), versus $0.688$ recall for a regex
 baseline and $0.116$ for the same model untuned. On a dedicated \emph{judgment-flip}
 test---where an identical sentence is benign in one context and malicious in
 another---the SLM labels both halves correctly $75\%$ of the time versus $17.5\%$
-for a keyword filter, directly demonstrating context-aware detection. The model runs
-at $37$\,ms median latency on a single consumer-class device. All results are
-in-distribution; external-benchmark generalization is identified as future work.
+for a keyword filter, directly demonstrating context-aware detection. The pipeline
+runs entirely on a single consumer-class device; the detector reaches $37$\,ms
+amortized throughput per query (single-request latency ${\sim}0.4$\,s, set by its
+reasoning trace). All results are in-distribution; external-benchmark generalization
+and single-request latency optimization are identified as future work.
 The model, data-generation pipeline, and evaluation harness are released open source.
 \end{abstract}
 
 \section{Introduction}
 Local RAG combines a retriever with a language model to ground responses in external
-knowledge while keeping data on user-controlled hardware~\cite{hipt}. Integrating
+knowledge while keeping data on user-controlled hardware~\cite{openragsoc}. Integrating
 external sources, however, exposes the system to prompt injection and data
-poisoning~\cite{greshake,agentpoison,hipt}. Unlike direct jailbreaks, \emph{indirect}
+poisoning~\cite{greshake,agentpoison,openragsoc}. Unlike direct jailbreaks, \emph{indirect}
 prompt injection embeds adversarial instructions in data that is later retrieved and
 processed, blurring the boundary between ``data'' and ``instructions''~\cite{greshake}.
 Greshake et al. show such attacks can compromise real LLM-integrated applications;
@@ -91,9 +92,9 @@ Retrieval-augmented generation (RAG) couples a parametric language model with a
 non-parametric retriever, conditioning generation on documents fetched from an
 external corpus~\cite{lewis}. RAG improves factuality and domain alignment and
 underpins most local ``chat-with-your-data'' assistants, but it widens the trust
-boundary: any content that can be retrieved can influence generation. The HiPT/%
+boundary: any content that can be retrieved can influence generation. The
 OpenRAG-Soc harness standardizes end-to-end RAG evaluation from ingestion through
-retrieval to answer generation~\cite{hipt}, which we adopt conceptually as the
+retrieval to answer generation~\cite{openragsoc}, which we adopt conceptually as the
 deployment setting for our defense.
 
 \subsection{Prompt Injection and Jailbreaks}
@@ -121,16 +122,16 @@ These works motivate two of our attack families (\textsf{poisoning} and
 retriever ranks highly, not merely obvious keyword triggers.
 
 \subsection{Benchmarks and Defenses}
-Benchmarks increasingly stress-test IPI in realistic carriers. Guo and Wei's HiPT
-embeds injections in hidden HTML, alt text, and accessibility attributes and ships
-deployable mitigations such as sanitization, Unicode normalization, and
-attribution-gated answering~\cite{hipt}; Yi et al. (BIPIA) benchmark indirect injection
+Benchmarks increasingly stress-test IPI in realistic carriers. The OpenRAG-Soc
+harness of Guo and Wei embeds injections in hidden HTML, alt text, and accessibility
+attributes and ships deployable mitigations such as sanitization, Unicode
+normalization, and attribution-gated answering~\cite{openragsoc}; Yi et al. (BIPIA) benchmark indirect injection
 and evaluate black- and white-box defenses~\cite{bipia}. On the guard side, Llama
 Guard is an LLM input--output safeguard trained on general safety
 taxonomies~\cite{llamaguard}, and prompt-level defenses (quote-and-cite,
 retrieval-aware critique, ``no new instructions from context'') attenuate risk but
 still rely on the base model implicitly separating data from
-instructions~\cite{hipt}. These efforts largely target either ingestion mechanics or
+instructions~\cite{openragsoc}. These efforts largely target either ingestion mechanics or
 generic safety; none provides a small, RAG-specialized model that explicitly verifies
 query--context consistency between retrieval and generation.
 
@@ -148,7 +149,7 @@ teacher/judge-level judgment at a fraction of the inference cost.
 nokast-secureRAG is a complementary, \emph{local} defense layer: a small, specialized
 model that explicitly reasons about the alignment between user intent and retrieved
 context before that context reaches the generator. In contrast to retrieval-centric
-sanitization~\cite{hipt}, generic safety guards~\cite{llamaguard}, and attack/poisoning
+sanitization~\cite{openragsoc}, generic safety guards~\cite{llamaguard}, and attack/poisoning
 studies~\cite{greshake,agentpoison,poisonedrag}, we contribute an \emph{implemented and
 empirically evaluated} system---with detection, utility, and latency measurements and a
 dedicated context-flip test---rather than a conceptual design or an attack.
@@ -186,20 +187,32 @@ blind to cross-check quality; and the agreed data trains the \textbf{student}.
 
 \begin{figure}[t]
 \centering
-\fbox{\parbox{0.92\textwidth}{\centering
-Teacher (35B) $\xrightarrow{\text{generate }(Q,C)+\text{label}}$ raw data
-$\;\rightarrow\;$ Judge (120B, blind relabel) $\xrightarrow{\text{agree/dispute}}$
-agreed data $\;\rightarrow\;$ Student (0.5B + LoRA) $\;\rightarrow\;$ semantic firewall}}
+\begin{tikzpicture}[
+  node distance=10mm and 14mm,
+  box/.style={draw, rounded corners, align=center, minimum height=11mm,
+              minimum width=20mm, inner sep=3pt, font=\small},
+  arr/.style={-{Stealth[length=2.2mm]}, thick}]
+  \node[box] (teacher) {Teacher\\35B};
+  \node[box, right=of teacher] (judge) {Judge\\120B};
+  \node[box, right=of judge] (student) {Student\\0.5B + LoRA};
+  \node[box, right=of student] (fw) {Semantic\\firewall};
+  \draw[arr] (teacher) -- node[above, font=\scriptsize, align=center]
+        {$(Q,C)$\\+ label} (judge);
+  \draw[arr] (judge) -- node[above, font=\scriptsize, align=center]
+        {agreed\\data} (student);
+  \draw[arr] (student) -- node[above, font=\scriptsize]{deploy} (fw);
+\end{tikzpicture}
 \caption{The teacher$\rightarrow$judge$\rightarrow$student pipeline. Models run one at
 a time on a single 121\,GB device.}
 \label{fig:pipe}
 \end{figure}
 
 \subsection{Synthetic data generation}
-The teacher generates five attack families plus benign and ambiguous cases:
-indirect prompt injection (\textsf{ipi}), knowledge-base poisoning, context hijacking
-(role/permission redefinition), PII exfiltration, and \textsf{borderline} (ambiguous
-instruction-like text). For each record the attack payload is embedded in $C$ (e.g.,
+The teacher generates four attack families---indirect prompt injection (\textsf{ipi}),
+knowledge-base poisoning, context hijacking (role/permission redefinition), and PII
+exfiltration---plus benign documentation and ambiguous \textsf{borderline} cases
+(instruction-like text that is off-intent but not clearly an attack). For each
+adversarial record the attack payload is embedded in $C$ (e.g.,
 inside an HTML comment, footer, or ``ignore previous instructions'' clause), never in
 $Q$, forcing the model to reason about consistency rather than detect noise. Outputs
 use \emph{schema-constrained decoding} (the serving engine masks any token that would
@@ -243,9 +256,14 @@ $121$\,GB unified memory, aarch64, CUDA 13.0) using an NVFP4 vLLM runtime. Model
 \subsection{Dataset}
 The pipeline produced \textbf{5{,}233} $(Q,C)$ records (Table~\ref{tab:data}).
 The independent judge agreed with the teacher on \textbf{95.0\%} of records
-($4{,}973$ agreed, $260$ disputed, $0$ without a verdict). The student is trained on
-the $4{,}973$ agreed records ($3{,}835$ train / $479$ validation); the test set
-comprises $740$ held-out records including $120$ intact judgment-flip pairs.
+($4{,}973$ agreed, $260$ disputed, $0$ without a verdict). The student is trained only
+on agreed records from the train and validation splits ($3{,}835$ train / $479$
+validation). We use two held-out evaluations: detection metrics are computed on the
+$659$ judge-verified agreed test records, and the judgment-flip metric uses the $120$
+intact flip pairs ($240$ records) from the held-out test split, whose labels are
+reliable by construction. (Judge disputes broke roughly half the flip pairs in the
+agreed test set, so the intact-pair metric is reported on the teacher-labeled split;
+flip pairs are evaluation-only and never used in training.)
 
 \begin{table}[t]
 \centering
@@ -281,9 +299,15 @@ Positive Rate (FPR)} (benign incorrectly flagged), three-class accuracy, and
 end-to-end \textbf{latency}. For the flip set we report per-record accuracy and the
 stricter \emph{both-correct} rate (both halves of a pair labeled correctly).
 
+\subsection{Reproducibility}
+All stages use a fixed random seed ($20{,}260{,}624$) with frozen train/validation/test
+splits; the teacher, judge, and base student use pinned NVFP4 / base-model revisions
+served via vLLM. The model, synthetic-data generation pipeline, and evaluation harness
+are released to support replication.
+
 \section{Results}
 \subsection{Detection performance}
-Table~\ref{tab:main} reports the held-out test set (judge-verified labels). The tuned
+Table~\ref{tab:main} reports the $659$ judge-verified agreed test records. The tuned
 SLM (B3) dominates every security metric: $0.994$ recall, $0.006$ ASR-proxy, $0.026$
 FPR, $0.974$ three-class accuracy. The \emph{same} model used zero-shot (B2) reaches
 only $0.116$ recall---it collapses to predicting \textsf{safe} for the large majority
@@ -292,13 +316,14 @@ of inputs---so fine-tuning raises recall from $0.116$ to $0.994$. The regex base
 
 \begin{table}[t]
 \centering
-\caption{Detection on the held-out test set (judge-verified labels). $\uparrow$/$\downarrow$
-indicate better direction.}
+\caption{Detection on the held-out test set ($659$ judge-verified agreed records).
+$\uparrow$/$\downarrow$ indicate better direction. The rightmost column is batched
+per-item time (throughput); single-request latency is ${\sim}0.4$\,s (Sec.~\ref{sec:latency}).}
 \label{tab:main}
 \begin{tabular}{lccccc}
 \toprule
 System & Recall\,$\uparrow$ & ASR-proxy\,$\downarrow$ & FPR\,$\downarrow$ &
-3-class acc\,$\uparrow$ & latency p50 \\
+3-class acc\,$\uparrow$ & batch p50 \\
 \midrule
 B1 regex (context-blind)      & 0.688 & 0.312 & 0.129 & 0.777 & $<\!1$\,ms \\
 B2 Qwen2.5-0.5B (zero-shot)   & 0.116 & 0.884 & 0.059 & 0.533 & 55\,ms \\
@@ -332,13 +357,18 @@ B2 Qwen2.5-0.5B (zero-shot)  & 0.529 & 0.117 \\
 \end{table}
 
 \subsection{Latency and efficiency}
-The tuned SLM runs at $37$\,ms median ($57$\,ms p95) per $(Q,C)$ call under batched
-evaluation on the GB10---well within the interactive sub-$100$\,ms target. Single-call
-eager latency is $\sim$$400$\,ms and would improve under an optimized serving runtime.
-End-to-end the pipeline is cheap: data generation drew $\sim$$35$\,Wh, fine-tuning
-$\sim$$9$\,Wh ($14.6$ minutes, $94\%$ GPU utilization), and the final adapter is
-$17.6$\,MB. The entire teacher$\rightarrow$judge$\rightarrow$student pipeline runs on a
-single consumer-class device.
+\label{sec:latency}
+We distinguish throughput from latency. Under batched evaluation (batch~$32$) the tuned
+SLM sustains $37$\,ms per $(Q,C)$ amortized---a \emph{throughput} figure. The
+deployment-relevant \emph{single-request} latency is $404$\,ms median ($513$\,ms p95)
+in eager transformers, dominated by generating the ${\sim}36$-word reasoning trace
+before the label; this exceeds the interactive sub-$100$\,ms target. A label-only
+variant (dropping the reasoning trace) or an optimized serving runtime
+(vLLM/llama.cpp) is the path to sub-$100$\,ms single-request latency, which we leave to
+future work. End-to-end the pipeline is nonetheless cheap: data generation drew
+$\sim$$35$\,Wh, fine-tuning $\sim$$9$\,Wh ($14.6$ minutes, $94\%$ GPU utilization), and
+the final adapter is $17.6$\,MB. The entire teacher$\rightarrow$judge$\rightarrow$%
+student pipeline runs on a single consumer-class device.
 
 \subsection{Data quality}
 The $95.0\%$ teacher--judge agreement indicates the labels are largely trustworthy
@@ -362,7 +392,7 @@ of local RAG. The independent cross-model judge provides a quantitative quality 
 \section{Limitations}
 We state limitations explicitly. (1) \textbf{In-distribution.} Training and test data
 share the same synthetic generator; the strong numbers are in-distribution and do not
-establish robustness on external benchmarks (e.g., HiPT/OpenRAG-Soc~\cite{hipt}) or in
+establish robustness on external benchmarks (e.g., OpenRAG-Soc~\cite{openragsoc}) or in
 the wild. (2) \textbf{ASR is a detection-side proxy}---whether the guard flags the
 attack---not the downstream generator's behavior. (3) \textbf{Adaptive adversaries}
 (multi-chunk fragmented or low-entropy stealth injections~\cite{agentpoison}) are
@@ -375,10 +405,11 @@ deployed-grade robustness.
 We implemented and evaluated nokast-secureRAG, a local $\sim$0.5B semantic firewall for
 indirect prompt injection in RAG, produced by a teacher$\rightarrow$judge$\rightarrow$%
 student distillation pipeline that runs entirely on a single consumer-class device.
-The tuned SLM reaches $0.994$ recall at $0.026$ FPR and $37$\,ms latency, and---most
+The tuned SLM reaches $0.994$ recall at $0.026$ FPR, and---most
 importantly---solves context-dependent ``judgment flip'' cases that keyword baselines
-cannot. External-benchmark generalization, true downstream-ASR measurement, and
-adaptive-adversary stress testing are the focus of the next iteration of this work.
+cannot. External-benchmark generalization, true downstream-ASR measurement,
+adaptive-adversary stress testing, and sub-$100$\,ms single-request latency are the
+focus of the next iteration of this work.
 The model, synthetic-data pipeline, and evaluation harness are released open source.
 
 % IEEE-style references. Verify arXiv identifiers and venues before camera-ready.
@@ -390,7 +421,7 @@ applications with indirect prompt injection,'' \emph{arXiv preprint arXiv:2302.1
 \bibitem{agentpoison} W. Chan, Z. Li, Y. Sun, Y. Zhang, and Y. Chen, ``Red-teaming
 LLM agents via poisoning memory or knowledge bases,'' \emph{arXiv preprint
 arXiv:2407.12784}, 2024.
-\bibitem{hipt} H. Guo and Z. Wei, ``Hidden-in-plain-text: A benchmark for social-web
+\bibitem{openragsoc} H. Guo and Z. Wei, ``Hidden-in-plain-text: A benchmark for social-web
 indirect prompt injection in RAG,'' \emph{arXiv preprint arXiv:2601.10923}, 2026.
 \bibitem{llamaguard} H. Inan, K. Upasani, J. Chi, R. Rungta, K. Iyer, Y. Mao,
 M. Tontchev, Q. Hu, B. Fuller, D. Testuggine, and M. Khabsa, ``Llama Guard: LLM-based
