@@ -1,0 +1,5 @@
+# Synthetic data generation + telemetry (talks to a vLLM OpenAI endpoint).
+# The teacher/judge models run in the vllm/vllm-openai:nightly-aarch64 container,
+# NOT via these deps. This is just the client side.
+requests>=2.31.0
+pyyaml>=6.0
