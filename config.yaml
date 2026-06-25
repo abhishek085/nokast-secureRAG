@@ -1,30 +1,38 @@
-# Example configuration for Nokast-secureRAG
+# Configuration for Nokast-secureRAG
 
-# Model Configuration
-MODEL_NAME: "Qwen/Qwen2.5-0.5B"
-OLLAMA_MODEL: "kimi-k2.5:cloud"
+# --- Models (DGX Spark GB10, NVFP4, run one at a time) ---
+TEACHER_MODEL: "nvidia/Qwen3.6-35B-A3B-NVFP4"          # generates (Q,C) data
+JUDGE_MODEL:   "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4"  # cross-checks labels
+STUDENT_MODEL: "Qwen/Qwen2.5-0.5B"                     # the fine-tuned defense model
+VLLM_ENDPOINT: "http://localhost:8000/v1"
 
-# Data Generation
-NUM_SAMPLES: 5000
-SAFE_RATIO: 0.5
+# --- Data generation ---
+N_BENIGN: 3000
+N_ADVERSARIAL: 2000
+N_FLIPS: 300            # judgment-flip pairs (-> 600 records, forced into test)
+GEN_WORKERS: 20
+GEN_TEMPERATURE: 0.9
 
-# Training Configuration
+# --- Labels / splits ---
+LABELS: ["safe", "suspicious", "malicious-instruction"]
+SPLIT_RATIOS: [0.8, 0.1, 0.1]   # train / val / test (flips always test)
+
+# --- Training (PEFT + TRL LoRA, CUDA) ---
 LORA_RANK: 8
 LORA_ALPHA: 16
 LORA_DROPOUT: 0.05
 LEARNING_RATE: 1e-4
 BATCH_SIZE: 4
 NUM_EPOCHS: 3
-TRAIN_SPLIT: 0.9
 
-# Detection Configuration
+# --- Detection ---
 CONFIDENCE_THRESHOLD: 0.7
 
-# Paths
+# --- Reproducibility ---
+SEED: 20260624
+
+# --- Paths ---
 DATA_DIR: "data"
 MODEL_DIR: "models"
 ADAPTER_DIR: "models/adapters"
-EVAL_DIR: "eval"
-
-# Ollama Configuration
-OLLAMA_URL: "http://localhost:11434"
+RESULTS_DIR: "results"
