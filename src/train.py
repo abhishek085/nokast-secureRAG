@@ -2,9 +2,6 @@
 LoRA fine-tuning of the student defense model (Qwen2.5-0.5B) on (Query, Context)
 records, with GB10 hardware + throughput telemetry.
 
-Replaces the Apple-MLX trainer with a CUDA PEFT + TRL path that runs on the DGX
-Spark (inside the vllm container, which provides a working CUDA torch).
-
 The model is trained reasoning-first (white paper 4.3): given [Query Q] || [Context
 C] it emits a short reasoning string then the label. Loss is masked to the
 completion only.
