@@ -21,7 +21,7 @@ from typing import Dict, List
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from eval.baselines import RegexBaseline
+from eval.baselines import RegexBaseline, ProtectAIBaseline, LlamaGuardBaseline, PromptGuardBaseline
 from src.telemetry import HardwareMonitor
 
 
@@ -100,6 +100,54 @@ def run_regex(rows: List[Dict]) -> Dict:
     return out
 
 
+def run_protectai(rows: List[Dict]) -> Dict:
+    b = ProtectAIBaseline()
+    t0 = time.time()
+    res = b.detect_batch(rows, batch_size=32)
+    latency_ms = (time.time() - t0) / len(rows) * 1000
+    preds = [r["label"] for r in res]
+    out = {"system": "B4-protectai-deberta", "latency_ms_mean": round(latency_ms, 3)}
+    out.update(security_metrics(rows, preds))
+    out.update(flip_accuracy(rows, preds))
+    import torch, gc
+    del b
+    gc.collect()
+    torch.cuda.empty_cache()
+    return out
+
+
+def run_llamaguard(rows: List[Dict]) -> Dict:
+    b = LlamaGuardBaseline()
+    t0 = time.time()
+    res = b.detect_batch(rows)
+    latency_ms = (time.time() - t0) / len(rows) * 1000
+    preds = [r["label"] for r in res]
+    out = {"system": "B5-llamaguard-3-1b", "latency_ms_mean": round(latency_ms, 3)}
+    out.update(security_metrics(rows, preds))
+    out.update(flip_accuracy(rows, preds))
+    import torch, gc
+    del b
+    gc.collect()
+    torch.cuda.empty_cache()
+    return out
+
+
+def run_promptguard(rows: List[Dict]) -> Dict:
+    b = PromptGuardBaseline()
+    t0 = time.time()
+    res = b.detect_batch(rows, batch_size=32)
+    latency_ms = (time.time() - t0) / len(rows) * 1000
+    preds = [r["label"] for r in res]
+    out = {"system": "B6-promptguard", "latency_ms_mean": round(latency_ms, 3)}
+    out.update(security_metrics(rows, preds))
+    out.update(flip_accuracy(rows, preds))
+    import torch, gc
+    del b
+    gc.collect()
+    torch.cuda.empty_cache()
+    return out
+
+
 def run_model(rows: List[Dict], adapter_path, base_model, tag, batch_size) -> Dict:
     from src.detector import ContextConsistencyDetector
     det = ContextConsistencyDetector(base_model=base_model, adapter_path=adapter_path)
@@ -129,6 +177,8 @@ def main():
     ap.add_argument("--adapter", default="models/adapters")
     ap.add_argument("--batch-size", type=int, default=32)
     ap.add_argument("--systems", default="regex,base,tuned")
+    ap.add_argument("--extra-systems", default="",
+                    help="comma list of extra baselines to run, e.g. protectai")
     args = ap.parse_args()
 
     rows = load_split(args.data, args.split)
@@ -148,6 +198,15 @@ def main():
     if "tuned" in want:
         print("[B3] tuned 0.5B (LoRA)...")
         results.append(run_model(rows, args.adapter, args.base_model, "B3-tuned-slm", args.batch_size))
+    if "protectai" in args.extra_systems.split(","):
+        print("[B4] ProtectAI deberta-v3-base-prompt-injection-v2...")
+        results.append(run_protectai(rows))
+    if "llamaguard" in args.extra_systems.split(","):
+        print("[B5] Llama Guard 3 1B...")
+        results.append(run_llamaguard(rows))
+    if "promptguard" in args.extra_systems.split(","):
+        print("[B6] Prompt-Guard-86M...")
+        results.append(run_promptguard(rows))
     mon.stop()
 
     report = {"split": args.split, "n": len(rows), "results": results,
